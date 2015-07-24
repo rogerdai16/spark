@@ -242,7 +242,7 @@ private[spark] object SQLConf {
     doc = "Whether the query analyzer should be case sensitive or not.")
 
   val PARQUET_SCHEMA_MERGING_ENABLED = booleanConf("spark.sql.parquet.mergeSchema",
-    defaultValue = Some(true),
+    defaultValue = Some(false),
     doc = "When true, the Parquet data source merges schemas collected from all data files, " +
           "otherwise the schema is picked from the summary file or a random data file " +
           "if no summary file is available.")
@@ -273,12 +273,8 @@ private[spark] object SQLConf {
       "uncompressed, snappy, gzip, lzo.")
 
   val PARQUET_FILTER_PUSHDOWN_ENABLED = booleanConf("spark.sql.parquet.filterPushdown",
-    defaultValue = Some(false),
-    doc = "Turn on Parquet filter pushdown optimization. This feature is turned off by default " +
-      "because of a known bug in Parquet 1.6.0rc3 " +
-      "(PARQUET-136, https://issues.apache.org/jira/browse/PARQUET-136). However, " +
-      "if your table doesn't contain any nullable string or binary columns, it's still safe to " +
-      "turn this feature on.")
+    defaultValue = Some(true),
+    doc = "Enables Parquet filter push-down optimization when set to true.")
 
   val PARQUET_USE_DATA_SOURCE_API = booleanConf("spark.sql.parquet.useDataSourceApi",
     defaultValue = Some(true),
@@ -376,6 +372,11 @@ private[spark] object SQLConf {
   val OUTPUT_COMMITTER_CLASS =
     stringConf("spark.sql.sources.outputCommitterClass", isPublic = false)
 
+  val PARALLEL_PARTITION_DISCOVERY_THRESHOLD = intConf(
+    key = "spark.sql.sources.parallelPartitionDiscovery.threshold",
+    defaultValue = Some(32),
+    doc = "<TODO>")
+
   // Whether to perform eager analysis when constructing a dataframe.
   // Set to false when debugging requires the ability to look at invalid query plans.
   val DATAFRAME_EAGER_ANALYSIS = booleanConf(
@@ -397,12 +398,12 @@ private[spark] object SQLConf {
     defaultValue = Some(true),
     isPublic = false)
 
+  val USE_SQL_AGGREGATE2 = booleanConf("spark.sql.useAggregate2",
+    defaultValue = Some(true), doc = "<TODO>")
+
   val USE_SQL_SERIALIZER2 = booleanConf(
     "spark.sql.useSerializer2",
     defaultValue = Some(true), isPublic = false)
-
-  val USE_JACKSON_STREAMING_API = booleanConf("spark.sql.json.useJacksonStreamingAPI",
-    defaultValue = Some(true), doc = "<TODO>")
 
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
@@ -471,9 +472,9 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
 
   private[spark] def unsafeEnabled: Boolean = getConf(UNSAFE_ENABLED)
 
-  private[spark] def useSqlSerializer2: Boolean = getConf(USE_SQL_SERIALIZER2)
+  private[spark] def useSqlAggregate2: Boolean = getConf(USE_SQL_AGGREGATE2)
 
-  private[spark] def useJacksonStreamingAPI: Boolean = getConf(USE_JACKSON_STREAMING_API)
+  private[spark] def useSqlSerializer2: Boolean = getConf(USE_SQL_SERIALIZER2)
 
   private[spark] def autoBroadcastJoinThreshold: Int = getConf(AUTO_BROADCASTJOIN_THRESHOLD)
 
@@ -499,6 +500,9 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
 
   private[spark] def partitionColumnTypeInferenceEnabled(): Boolean =
     getConf(SQLConf.PARTITION_COLUMN_TYPE_INFERENCE)
+
+  private[spark] def parallelPartitionDiscoveryThreshold: Int =
+    getConf(SQLConf.PARALLEL_PARTITION_DISCOVERY_THRESHOLD)
 
   // Do not use a value larger than 4000 as the default value of this property.
   // See the comments of SCHEMA_STRING_LENGTH_THRESHOLD above for more information.
